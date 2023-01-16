@@ -1,0 +1,295 @@
+import { useReducer, useEffect } from "react";
+import io from "socket.io-client";
+import { ThemeProvider } from "@mui/material/styles";
+import chatImg from "./../project2v2/logo/chat.png";
+import {
+    RadioGroup, Radio, Button, TextField, Typography, Dialog, DialogTitle, DialogContent, FormControl, FormControlLabel, Card, CardContent, CardActions,
+} from "@mui/material";
+
+import theme from "../theme";
+import TopBar from "./topbar";
+import "./../App.css";
+import MsgBubbleList from "./msgbubblelist";
+import UserList from "./userlist";
+
+const Casestudy2 = () => {
+    const initialState = {
+        messages: [],
+        status: "",
+        isJoinScreen: true,
+        alreadyexists: false,
+        chatName: "",
+        roomName: "",
+        users: [],
+        typingMsg: "",
+        isTyping: false,
+        message: "",
+        dialogOpen: false,
+        rooms: [],
+    };
+    const reducer = (state, newState) => ({ ...state, ...newState });
+    const [state, setState] = useReducer(reducer, initialState);
+    useEffect(() => {
+        serverConnect();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    const serverConnect = () => {
+        // connect to server
+        //const socket = io.connect("localhost:5000", {
+        //    forceNew: true,
+        //    transports: ["websocket"],
+        //    autoConnect: true,
+        //    reconnection: false,
+        //    timeout: 5000,
+        //});
+
+        // connect to server on Heroku
+        const socket = io.connect();
+
+        socket.on("nameexists", onExists);
+        socket.on("welcome", addMessage);
+        socket.on("someonejoined", addMessage);
+        socket.on("someoneleft", addMessage);
+        socket.on("someoneistyping", onTyping);
+        socket.on("newmessage", onNewMessage);
+        socket.on("allrooms", onAllRooms);
+        socket.on("roomsAndusers", onRoomsAndUsers);
+        setState({ socket: socket });
+    };
+
+    const onAllRooms = (dataFromServer) => {
+        setState({ rooms: dataFromServer.rooms });
+    };
+
+    const onRoomsAndUsers = (dataFromServer) => {
+        setState({ rooms: dataFromServer.rooms, users: dataFromServer.users });
+    };
+
+    const onNewMessage = (dataFromServer) => {
+        addMessage(dataFromServer);
+        setState({ typingMsg: "" });
+    };
+    const onExists = (dataFromServer) => {
+        setState({ status: dataFromServer.text });
+    };
+    // generic handler for all other messages:
+    const addMessage = (dataFromServer) => {
+        let messages = state.messages;
+        messages.push(dataFromServer);
+        setState({
+            messages: messages,
+            isJoinScreen: false,
+            alreadyexists: false,
+        });
+    };
+
+    // handler for join button click
+    const handleJoin = () => {
+        state.socket.emit("join", {
+            chatName: state.chatName,
+            roomName: state.roomName,
+        });
+
+    };
+    // handler for name TextField entry
+    const onNameChange = (e) => {
+        setState({ chatName: e.target.value, status: "" });
+    };
+    // handler for room TextField entry
+    const onRoomChange = (e) => {
+        setState({ roomName: e.target.value });
+    };
+    const onTyping = (dataFromServer) => {
+        if (dataFromServer.from !== state.chatName) {
+            setState({
+                typingMsg: dataFromServer.text,
+            });
+        }
+    };
+
+    // keypress handler for message TextField
+    const onMessageChange = (e) => {
+        setState({ message: e.target.value });
+        if (state.isTyping === false) {
+            state.socket.emit("typing", { from: state.chatName }, (err) => { });
+            setState({ isTyping: true }); // flag first byte only
+        }
+    };
+
+    // enter key handler to send message
+    const handleSendMessage = (e) => {
+        if (state.message !== "") {
+            state.socket.emit(
+                "message",
+                { from: state.chatName, text: state.message },
+                (err) => { }
+            );
+            setState({ isTyping: false, message: "" });
+        }
+    };
+
+    const handleOpenDialog = () => setState({ dialogOpen: true });
+    const handleCloseDialog = () => setState({ dialogOpen: false });
+    const handleRadioChange = (e) => setState({ roomName: e.target.value });
+    return (
+        <ThemeProvider theme={theme}>
+            <div>
+                <TopBar
+                    viewDialog={handleOpenDialog}
+                    isLogin={state.isJoinScreen}
+                    room={state.roomName}
+                />
+                <Dialog
+                    open={state.dialogOpen}
+                    onClose={handleCloseDialog}
+                    style={{ margin: 20 }}
+                >
+                    <DialogTitle
+                        style={{
+                            textAlign: "center",
+                            marginTop: "2vh",
+                            fontWeight: "bold",
+                            fontSize: 20,
+                            color: "rgb(25, 118, 211)",
+                        }}
+                    >
+                        Who's On?
+                    </DialogTitle>
+                    <DialogContent>
+                        <UserList users={state.users} />
+                    </DialogContent>
+                </Dialog>
+
+            </div>
+            {state.isJoinScreen && (
+                <div>
+                    <div style={{ textAlign: "center", padding: 20, paddingBottom: 5 }}>
+                        <img style={{ height: 50, alignContent: 'center' }} src={chatImg} alt="chat logo" />
+                    </div>
+
+                    <h3 style={{ textAlign: "center", marginBottom: 10, marginTop: 5, color: '#fd5e53' }}>Sign In</h3>
+                </div>
+            )}
+
+
+
+            {state.isJoinScreen && (
+                <div>
+                    <div
+                        style={{
+
+                            borderWidth: 1,
+                            textAlign: "center",
+                            padding: "3vw",
+                            margin: "3vw",
+                        }}
+                    >
+                        <Card style={{ paddingLeft: 15, paddingTop: 15 }}>
+
+                            <TextField
+                                style={{ width: "100%" }}
+                                onChange={onNameChange}
+                                placeholder="Enter unique name"
+                                required
+                                value={state.chatName}
+                                error={state.status !== "" || state.chatName === ""}
+                                helperText={
+                                    state.chatName === "" ? "enter a chat name" : state.status
+                                }
+                            />{" "}
+
+                        </Card>
+
+                    </div>
+                    <p></p>
+                    <div
+                        style={{
+
+                            borderWidth: 0.5,
+                            textAlign: "center",
+                            padding: "3vw",
+                            margin: "3vw",
+                        }}
+                    >
+                        <Card style={{ paddingLeft: 15, paddingTop: 15 }}>
+                            <h4 style={{ textAlign: "left", paddingLeft: "3%", margin: 10, color: '#fd5e53' }}>Join Existing or Enter Room Name</h4>
+                            <div style={{ textAlign: "left" }}>
+                                <FormControl component="fieldset">
+                                    <RadioGroup onChange={handleRadioChange}>
+                                        {state.rooms.map((room, idx) => (
+                                            <FormControlLabel
+                                                key={idx}
+                                                labelPlacement="end"
+                                                value={room}
+                                                control={<Radio />}
+                                                label={room}
+                                            />
+                                        ))}{" "}
+                                    </RadioGroup>
+                                </FormControl>
+                                <TextField
+                                    style={{ width: "100%" }}
+                                    onChange={onRoomChange}
+                                    placeholder="Room Name"
+                                    required
+                                    value={state.roomName}
+                                    error={state.roomName === ""}
+                                    helperText={state.roomName === "" ? "enter a room name" : ""}
+                                />
+                            </div>
+                        </Card>
+
+                    </div>
+                    <p></p>
+                    <Button
+                        variant="contained"
+                        data-testid="submit"
+                        color="primary"
+                        style={{ marginLeft: "3%", marginTop: 15 }}
+                        onClick={() => handleJoin()}
+                        disabled={
+                            state.chatName === "" ||
+                            state.roomName === "" ||
+                            /^\s+$/.test(state.chatName) ||
+                            /^\s+$/.test(state.roomName)
+                        }
+                    >
+                        JOIN
+                    </Button>
+                </div>
+            )}
+
+            {!state.isJoinScreen && (
+                <Card style={{ margin: "2.5%", width: "95%" }}>
+                    <CardContent style={{ textAlign: "center", maxHeight: "350" }}>
+                        {state.messages && (
+                            <div className="msgList">
+                                <MsgBubbleList
+                                    messages={state.messages}
+                                    username={state.chatName}
+                                    room={state.roomName}
+                                />
+                            </div>
+                        )}
+                        <CardActions style={{ marginBottom: "1.5vh", marginTop: "1vh" }}>
+                            <TextField
+                                style={{ width: "95%" }}
+                                onChange={onMessageChange}
+                                placeholder="Send"
+                                autoFocus={true}
+                                value={state.message}
+                                onKeyPress={(e) =>
+                                    e.key === "Enter" ? handleSendMessage() : null
+                                }
+                            />
+                        </CardActions>
+                        <div>
+                            <Typography color="primary">{state.typingMsg}</Typography>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+        </ThemeProvider>
+    );
+};
+export default Casestudy2;

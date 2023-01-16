@@ -1,0 +1,123 @@
+let users = [];
+let usedColor = [];
+let rooms = ["main"];
+const moment = require("moment");
+const adminColor = "#1b5e20";
+const color = require("./colors.json");
+
+const getColor = () => {
+    let coloridx = adminColor;
+    while (
+        coloridx == adminColor ||
+        usedColor.find((item) => item == coloridx) !== undefined
+    ) {
+        coloridx = Math.floor(Math.random() * color.colours.length) + 1;
+    }
+    usedColor.push(color.colours[coloridx]);
+    //console.log(usedColor);
+    return color.colours[coloridx];
+};
+
+const getTime = () => {
+    return `${moment().format("h:mm:ss a")}`;
+};
+
+const handleJoin = (socket, client) => {
+    let foundName = users.find((item) => item.name === client.chatName);
+    let foundRoom = rooms.find((item) => item === client.roomName);
+    if (foundRoom === undefined) rooms.push(client.roomName);
+    if (foundName !== undefined) {
+        socket.emit("nameexists", {
+            text: "name already taken, try a different name",
+            colour: adminColor,
+            from: "Admin",
+            time: getTime(),
+        });
+    } else {
+        socket.name = client.chatName;
+        socket.join(client.roomName);
+        socket.emit("welcome", {
+            text: `Welcome ${client.chatName}`,
+            colour: adminColor,
+            from: "Admin",
+            time: getTime(),
+        });
+        socket.to(client.roomName).emit("someonejoined", {
+            text: `${client.chatName} has joined the ${client.roomName} room!`,
+            colour: adminColor,
+            from: "Admin",
+            time: getTime(),
+        });
+        let foundRoom = rooms.find((item) => item === client.roomName);
+        if (foundRoom === undefined) rooms.push(client.roomName);
+        users.push({
+            name: client.chatName,
+            colour: getColor(),
+            room: client.roomName,
+        });
+    }
+};
+
+const handleDisconnect = (socket) => {
+    if (socket.name !== undefined) {
+        let foundName = users.find((item) => item.name == socket.name);
+        socket.to(foundName.room).emit("someoneleft", {
+            text: `${socket.name} has left room ${foundName.room}!`,
+            colour: adminColor,
+            from: "Admin",
+            time: getTime(),
+        });
+        users = users.filter((item) => item.name !== socket.name);
+        usedColor = usedColor.filter((item) => item !== foundName.colour);
+    }
+};
+
+const handleTyping = (socket, clientData) => {
+    let foundName = users.find((item) => item.name == clientData.from);
+    socket.to(foundName.room).emit("someoneistyping", {
+        text: `${clientData.from} is typing`,
+        colour: adminColor,
+        from: "Admin",
+        time: getTime(),
+    });
+};
+const handleAllRooms = (socket) => {
+    socket.emit("allrooms", { rooms: rooms });
+};
+const handleGetRoomsAndUsers = (io) => {
+    io.emit("roomsAndusers", { rooms: rooms, users: users });
+};
+// const handleMessage = (socket, clientData) => {
+//   let foundName = users.find((item) => item.name == clientData.from);
+//   socket.emit("newmessage", {
+//     text: clientData.text,
+//     colour: foundName.colour,
+//     from: clientData.from,
+//     time: getTime(),
+//   });
+
+//   socket.to(foundName.room).emit("newmessage", {
+//     text: clientData.text,
+//     colour: foundName.colour,
+//     from: clientData.from,
+//     time: getTime(),
+//   });
+// };
+
+const handleMessage = (io, clientData) => {
+    let foundName = users.find((item) => item.name == clientData.from);
+    io.in(foundName.room).emit("newmessage", {
+        text: clientData.text,
+        colour: foundName.colour,
+        from: clientData.from,
+        time: getTime(),
+    });
+};
+module.exports = {
+    handleJoin,
+    handleDisconnect,
+    handleTyping,
+    handleMessage,
+    handleGetRoomsAndUsers,
+    handleAllRooms,
+};

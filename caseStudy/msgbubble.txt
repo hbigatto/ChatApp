@@ -1,0 +1,26 @@
+import { useEffect, useRef } from "react";
+import { ListItem } from "@mui/material";
+import Bubble from "./bubble";
+import Triangle from "./triangle";
+
+const MsgBubble = (props) => {
+    const userRef = useRef(null);
+    useEffect(() => {
+        userRef.current.scrollIntoView(true);
+    }, []);
+
+    return (
+        <div className={props.isUser ? "listRight" : "listLeft"}>
+            <ListItem ref={userRef}>
+                <Bubble message={props.message} room={props.room} />
+                <Triangle
+                    colour={props.message.colour}
+                    alignTriangle={props.isUser ? `63%` : ""}
+                />
+            </ListItem>
+            <p></p>
+        </div>
+    );
+};
+
+export default MsgBubble;

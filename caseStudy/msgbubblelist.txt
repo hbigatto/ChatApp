@@ -1,0 +1,23 @@
+import { List } from "@mui/material";
+import MsgBubble from "./msgbubble";
+
+const MsgBubbleList = (props) => {
+    const isUser = (from) => {
+        return props.username === from;
+    };
+
+    let messages = props.messages.map((message, idx) => {
+        return (
+            <MsgBubble
+                key={idx}
+                message={message}
+                room={props.room}
+                isUser={isUser(message.from)}
+            />
+        );
+    });
+
+    return <List>{messages}</List>;
+};
+
+export default MsgBubbleList;
